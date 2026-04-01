@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:ns1="http://schemas.android.com/tools">
+    <color name="primary">#005F73</color>
+    <color name="primaryVariant">#0A9396</color>
+    <color name="secondary">#EE9B00</color>
+    <color name="surfaceAlt">#F6F6F6</color>
+    <color name="textPrimary">#1F2933</color>
+    <color name="white">#FFFFFF</color>
+    <string name="add_product">新增商品</string>
+    <string name="all_categories">全部分類</string>
+    <string name="app_name">貨品資訊盤存app</string>
+    <string name="cancel">取消</string>
+    <string name="category_management">分類管理</string>
+    <string name="category_name">分類名稱</string>
+    <string name="choose_photo">選擇照片</string>
+    <string name="cost_price">進貨價</string>
+    <string name="created_at">建立時間</string>
+    <string name="delete">刪除</string>
+    <string name="edit_product">編輯商品</string>
+    <string name="empty_hint">目前尚無資料</string>
+    <string name="new_stock">盤點數量</string>
+    <string name="no_category">未分類</string>
+    <string name="note">備註</string>
+    <string name="product_code">商品編號或條碼</string>
+    <string name="product_management">商品管理</string>
+    <string name="product_name">商品名稱</string>
+    <string name="sale_price">售價</string>
+    <string name="save">儲存</string>
+    <string name="search_product">搜尋商品名稱</string>
+    <string name="select_gallery">從相簿選擇</string>
+    <string name="stock">庫存</string>
+    <string name="stock_take">盤點功能</string>
+    <string name="take_photo">相機拍照</string>
+    <string name="update_stock">更新庫存</string>
+    <string name="updated_at">更新時間</string>
+    <style name="Theme.InventoryApp" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorSecondary">@color/secondary</item>
+        <item name="android:statusBarColor">@color/primary</item>
+        <item name="android:navigationBarColor">@color/white</item>
+        <item name="android:windowLightStatusBar" ns1:targetApi="23">false</item>
+    </style>
+</resources>

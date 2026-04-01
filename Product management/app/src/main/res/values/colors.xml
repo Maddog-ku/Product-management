@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- iOS Style Colors -->
+    <color name="primary">#007AFF</color>         <!-- iOS Blue -->
+    <color name="primaryVariant">#0056B3</color>
+    <color name="secondary">#34C759</color>       <!-- iOS Green -->
+    <color name="surfaceAlt">#F2F2F7</color>      <!-- iOS grouped background -->
+    <color name="textPrimary">#1C1C1E</color>     <!-- iOS dark text -->
+    <color name="textSecondary">#8E8E93</color>   <!-- iOS light text -->
+    <color name="white">#FFFFFF</color>
+    <color name="searchBg">#E3E3E8</color>        <!-- iOS Search bar gray -->
+    <color name="divider">#C6C6C8</color>
+    <color name="danger">#FF3B30</color>          <!-- iOS Red -->
+</resources>

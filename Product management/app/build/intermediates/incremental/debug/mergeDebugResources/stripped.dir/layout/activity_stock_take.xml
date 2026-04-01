@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/surfaceAlt"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/surfaceAlt"
+        app:titleCentered="true"
+        app:titleTextColor="@color/textPrimary"
+        app:navigationIconTint="@color/primary"
+        app:navigationIcon="@android:drawable/ic_media_previous"
+        app:title="盤點功能" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerStockTake"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="16dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnUpdateAllStock"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_margin="16dp"
+        app:cornerRadius="12dp"
+        android:backgroundTint="@color/primary"
+        android:textColor="@color/white"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        android:text="@string/update_stock" />
+
+</LinearLayout>

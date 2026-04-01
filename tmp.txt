@@ -1,0 +1,399 @@
+package com.example.inventoryapp.ui;
+
+import android.Manifest;
+import android.content.ContentResolver;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.widget.ArrayAdapter;
+import android.widget.ImageView;
+import android.widget.Toast;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.PickVisualMediaRequest;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+
+import com.bumptech.glide.Glide;
+import com.example.inventoryapp.R;
+import com.example.inventoryapp.data.Category;
+import com.example.inventoryapp.data.Product;
+import com.example.inventoryapp.repository.InventoryRepository;
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.textfield.MaterialAutoCompleteTextView;
+import com.google.android.material.textfield.TextInputEditText;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+
+public class AddEditProductActivity extends AppCompatActivity {
+
+    private InventoryRepository repository;
+    private final List<Category> categories = new ArrayList<>();
+    private TextInputEditText etName;
+    private MaterialAutoCompleteTextView actCategory;
+    private TextInputEditText etCostPrice;
+    private TextInputEditText etSalePrice;
+    private TextInputEditText etStock;
+    private TextInputEditText etNote;
+    private ImageView ivProduct;
+    private Uri selectedImageUri;
+    private Integer editingProductId;
+    private long createdAt;
+    private Integer selectedCategoryIdForEdit;
+
+    private final ActivityResultLauncher<PickVisualMediaRequest> galleryLauncher =
+            registerForActivityResult(new ActivityResultContracts.PickVisualMedia(), uri -> {
+                if (uri != null) {
+                    selectedImageUri = copyUriToAppStorage(uri);
+                    showImage(selectedImageUri);
+                }
+            });
+
+    private final ActivityResultLauncher<Void> cameraLauncher =
+            registerForActivityResult(new ActivityResultContracts.TakePicturePreview(), bitmap -> {
+                if (bitmap != null) {
+                    selectedImageUri = saveBitmapToAppStorage(bitmap);
+                    showImage(selectedImageUri);
+                }
+            });
+
+    private final ActivityResultLauncher<String> permissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                if (granted) {
+                    openGallery();
+                } else {
+                    Toast.makeText(this, "需要照片權限才能選取圖片", Toast.LENGTH_SHORT).show();
+                }
+            });
+
+    private final ActivityResultLauncher<String> cameraPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                if (granted) {
+                    cameraLauncher.launch(null);
+                } else {
+                    Toast.makeText(this, "需要相機權限才能拍照", Toast.LENGTH_SHORT).show();
+                }
+            });
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_add_edit_product);
+
+        repository = InventoryRepository.getInstance(this);
+        editingProductId = getIntent().hasExtra(ProductListActivity.EXTRA_PRODUCT_ID)
+                ? getIntent().getIntExtra(ProductListActivity.EXTRA_PRODUCT_ID, -1)
+                : null;
+        if (editingProductId != null && editingProductId == -1) {
+            editingProductId = null;
+        }
+
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        toolbar.setTitle(editingProductId == null ? R.string.add_product : R.string.edit_product);
+        toolbar.setNavigationOnClickListener(v -> finish());
+
+        etName = findViewById(R.id.etProductName);
+        actCategory = findViewById(R.id.actCategory);
+        etCostPrice = findViewById(R.id.etCostPrice);
+        etSalePrice = findViewById(R.id.etSalePrice);
+        etStock = findViewById(R.id.etStock);
+        etNote = findViewById(R.id.etNote);
+        ivProduct = findViewById(R.id.ivSelectedProduct);
+        MaterialButton btnChoosePhoto = findViewById(R.id.btnChoosePhoto);
+        MaterialButton btnSave = findViewById(R.id.btnSaveProduct);
+        MaterialButton btnDelete = findViewById(R.id.btnDeleteProduct);
+
+        btnChoosePhoto.setOnClickListener(v -> showPhotoSourceDialog());
+        btnSave.setOnClickListener(v -> saveProduct());
+        btnDelete.setOnClickListener(v -> {
+            if (editingProductId != null) {
+                new AlertDialog.Builder(this)
+                        .setTitle("刪除確認")
+                        .setMessage("確定要刪除這項商品嗎？這將無法復原。")
+                        .setPositiveButton("確認刪除", (dialog, which) -> {
+                            repository.deleteProduct(editingProductId);
+                            Toast.makeText(this, "商品已刪除", Toast.LENGTH_SHORT).show();
+                            finish();
+                        })
+                        .setNegativeButton("取消", null)
+                        .show();
+            }
+        });
+        btnDelete.setEnabled(editingProductId != null);
+
+        repository.getCategories().observe(this, items -> {
+            categories.clear();
+            categories.addAll(items);
+            List<String> names = new ArrayList<>();
+            for (Category category : items) {
+                names.add(category.getName());
+            }
+            names.add("+ 新增分類"); // 添加新增分類選項
+            
+            String currentText = actCategory.getText() == null ? "" : actCategory.getText().toString();
+            actCategory.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, names));
+            if (!currentText.isEmpty() && !currentText.equals("+ 新增分類")) {
+                actCategory.setText(currentText, false);
+            }
+            
+            applySelectedCategory();
+        });
+
+        actCategory.setOnItemClickListener((parent, view, position, id) -> {
+            String selected = parent.getItemAtPosition(position).toString();
+            if ("+ 新增分類".equals(selected)) {
+                actCategory.setText("", false); // 清除選擇
+                showAddCategoryDialog();
+            }
+        });
+
+        if (editingProductId != null) {
+            loadProduct(editingProductId);
+        } else {
+            createdAt = System.currentTimeMillis();
+        }
+    }
+
+    private void loadProduct(int productId) {
+        repository.getProductById(productId, product -> runOnUiThread(() -> {
+            if (product == null) {
+                finish();
+                return;
+            }
+            createdAt = product.getCreatedAt();
+            etName.setText(product.getName());
+            etCostPrice.setText(String.valueOf(product.getCostPrice()));
+            etSalePrice.setText(String.valueOf(product.getSalePrice()));
+            etStock.setText(String.valueOf(product.getStock()));
+            etNote.setText(product.getNote());
+            selectedImageUri = product.getImagePath() == null ? null : Uri.parse(product.getImagePath());
+            showImage(selectedImageUri);
+            selectedCategoryIdForEdit = product.getCategoryId();
+            applySelectedCategory();
+        }));
+    }
+
+    private void showAddCategoryDialog() {
+        TextInputEditText input = new TextInputEditText(this);
+        input.setHint("輸入新分類名稱");
+        
+        android.widget.FrameLayout container = new android.widget.FrameLayout(this);
+        android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, 
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(60, 20, 60, 0);
+        input.setLayoutParams(params);
+        container.addView(input);
+        
+        new AlertDialog.Builder(this)
+                .setTitle("新增分類")
+                .setView(container)
+                .setPositiveButton("新增", (dialog, which) -> {
+                    String newCatName = getText(input);
+                    if (!TextUtils.isEmpty(newCatName)) {
+                        Category newCat = new Category(newCatName);
+                        repository.insertCategory(newCat);
+                        actCategory.setText(newCatName, false);
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void applySelectedCategory() {
+        if (selectedCategoryIdForEdit == null) {
+            return;
+        }
+        for (Category category : categories) {
+            if (category.getId() == selectedCategoryIdForEdit) {
+                actCategory.setText(category.getName(), false);
+                selectedCategoryIdForEdit = null; // Clear so subsequent LiveData updates don't overwrite manual edits
+                break;
+            }
+        }
+    }
+
+    private void saveProduct() {
+        // 基本表單驗證，避免資料不完整直接寫入資料庫。
+        String name = getText(etName);
+        String code = ""; // 不再需要商品編號
+        String costPriceText = getText(etCostPrice);
+        String salePriceText = getText(etSalePrice);
+        String stockText = getText(etStock);
+        String note = getText(etNote);
+
+        if (TextUtils.isEmpty(name)) {
+            etName.setError("請輸入商品名稱");
+            etName.requestFocus();
+            return;
+        }
+        
+        if (TextUtils.isEmpty(salePriceText)) {
+            etSalePrice.setError("請輸入售價");
+            etSalePrice.requestFocus();
+            return;
+        }
+        if (!isNumeric(salePriceText)) {
+            Toast.makeText(this, "請輸入正確的售價格式", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (TextUtils.isEmpty(costPriceText)) costPriceText = "0";
+        if (TextUtils.isEmpty(stockText)) stockText = "0";
+
+        if (!isNumeric(costPriceText) || !TextUtils.isDigitsOnly(stockText)) {
+            Toast.makeText(this, "進貨價或庫存格式錯誤", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Integer categoryId = null;
+        String selectedCategory = actCategory.getText() == null ? "" : actCategory.getText().toString().trim();
+        for (Category category : categories) {
+            if (category.getName().equals(selectedCategory)) {
+                categoryId = category.getId();
+                break;
+            }
+        }
+
+        long now = System.currentTimeMillis();
+        Product product = new Product(
+                name,
+                code,
+                selectedImageUri == null ? "" : selectedImageUri.toString(),
+                categoryId,
+                Double.parseDouble(costPriceText),
+                Double.parseDouble(salePriceText),
+                Integer.parseInt(stockText),
+                note,
+                createdAt == 0 ? now : createdAt,
+                now
+        );
+
+        if (editingProductId == null) {
+            repository.insertProduct(product);
+            Toast.makeText(this, "商品已新增", Toast.LENGTH_SHORT).show();
+        } else {
+            product.setId(editingProductId);
+            repository.updateProduct(product);
+            Toast.makeText(this, "商品已更新", Toast.LENGTH_SHORT).show();
+        }
+        finish();
+    }
+
+    private void showPhotoSourceDialog() {
+        String[] items = {getString(R.string.take_photo), getString(R.string.select_gallery)};
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.choose_photo)
+                .setItems(items, (dialog, which) -> {
+                    if (which == 0) {
+                        requestCamera();
+                    } else {
+                        requestGallery();
+                    }
+                })
+                .show();
+    }
+
+    private void requestGallery() {
+        String permission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                ? Manifest.permission.READ_MEDIA_IMAGES
+                : Manifest.permission.READ_EXTERNAL_STORAGE;
+        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
+            openGallery();
+        } else {
+            permissionLauncher.launch(permission);
+        }
+    }
+
+    private void requestCamera() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            cameraLauncher.launch(null);
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+        }
+    }
+
+    private void openGallery() {
+        galleryLauncher.launch(new PickVisualMediaRequest.Builder()
+                .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE)
+                .build());
+    }
+
+    private void showImage(@Nullable Uri uri) {
+        if (uri == null) {
+            ivProduct.setImageResource(R.drawable.ic_image_placeholder);
+            return;
+        }
+        Glide.with(this)
+                .load(uri)
+                .centerCrop()
+                .placeholder(R.drawable.ic_image_placeholder)
+                .into(ivProduct);
+    }
+
+    private Uri saveBitmapToAppStorage(Bitmap bitmap) {
+        File file = new File(getImageDir(), "camera_" + System.currentTimeMillis() + ".jpg");
+        try (OutputStream outputStream = new FileOutputStream(file)) {
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
+            return Uri.fromFile(file);
+        } catch (IOException e) {
+            Toast.makeText(this, "照片儲存失敗", Toast.LENGTH_SHORT).show();
+            return null;
+        }
+    }
+
+    private Uri copyUriToAppStorage(Uri sourceUri) {
+        ContentResolver resolver = getContentResolver();
+        File file = new File(getImageDir(), "gallery_" + System.currentTimeMillis() + ".jpg");
+        try (InputStream inputStream = resolver.openInputStream(sourceUri);
+             OutputStream outputStream = new FileOutputStream(file)) {
+            if (inputStream == null) {
+                return sourceUri;
+            }
+            byte[] buffer = new byte[8 * 1024];
+            int length;
+            while ((length = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, length);
+            }
+            return Uri.fromFile(file);
+        } catch (IOException e) {
+            Toast.makeText(this, "照片複製失敗", Toast.LENGTH_SHORT).show();
+            return sourceUri;
+        }
+    }
+
+    private File getImageDir() {
+        File dir = new File(getFilesDir(), "product_images");
+        if (!dir.exists()) {
+            // 建立 App 私有圖片目錄，讓圖片路徑更穩定。
+            dir.mkdirs();
+        }
+        return dir;
+    }
+
+    private boolean isNumeric(String value) {
+        try {
+            Double.parseDouble(value);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private String getText(TextInputEditText editText) {
+        return editText.getText() == null ? "" : editText.getText().toString().trim();
+    }
+}
