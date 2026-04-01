@@ -189,15 +189,3 @@ Product management/
 - `AppDatabase` 同時使用 `addMigrations(MIGRATION_1_2)` 與 `fallbackToDestructiveMigration()`；未來若版本再升級，仍需謹慎處理 migration 策略。
 - 根目錄目前缺少 Gradle Wrapper 檔案，對命令列建置與 CI 會有影響。
 
-## 後續可擴充方向
-
-- 新增條碼掃描 / QR Code 掃描
-- 補上交易紀錄、銷售報表與庫存異動歷史
-- 支援匯出 CSV / Excel
-- 增加低庫存提醒
-- 將 UI 與通知文案完整在地化
-- 導入 ViewModel，讓 UI 與資料邏輯進一步分離
-
-## 授權
-
-目前專案內未看到明確授權聲明；若要公開發布，建議補上 `LICENSE` 檔案。
